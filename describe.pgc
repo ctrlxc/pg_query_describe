@@ -1,0 +1,93 @@
+#include "describe.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+EXEC SQL include sqlda.h;
+sqlda_t *sqlda;
+
+EXEC SQL WHENEVER SQLERROR CALL error();
+
+void error()
+{
+    fprintf(stdout, "sqlcode: %ld\n", sqlca.sqlcode);
+    fprintf(stdout, "sqlstate: %5s\n", sqlca.sqlstate);
+    fprintf(stdout, "sqlerrm: %s\n", sqlca.sqlerrm.sqlerrmc);
+
+    exit(1);
+}
+
+// ecpgtype.h
+// name of `enum ECPGttype`
+const char* nameOf(int type)
+{
+    static const char* types[] = {
+        "",
+        "text",             // ECPGt_char
+        "",                 // ECPGt_unsigned_char
+        "smallint",         // ECPGt_short
+        "",                 // ECPGt_unsigned_short
+        "int",              // ECPGt_int
+        "",                 // ECPGt_unsigned_int
+        "int4",             // ECPGt_long
+        "",                 // ECPGt_unsigned_long
+        "bigint",           // ECPGt_long_long
+        "",                 // ECPGt_unsigned_long_long
+        "boolean",          // ECPGt_bool
+        "double precision", // ECPGt_float
+        "double precision", // ECPGt_double
+        "text",             // ECPGt_varchar
+        "text",             // ECPGt_varchar2
+        "numeric",          // ECPGt_numeric
+        "decimal",          // ECPGt_decimal
+        "date",             // ECPGt_date
+        "timestamp",        // ECPGt_timestamp
+        "interval",         // ECPGt_interval
+        "",                 // ECPGt_array
+        "",                 // ECPGt_struct
+        "",                 // ECPGt_union
+        "",                 // ECPGt_descriptor
+        "",                 // ECPGt_char_variable
+        "",                 // ECPGt_const
+        "",                 // ECPGt_EOIT
+        "",                 // ECPGt_EORT
+        "",                 // ECPGt_NO_INDICATOR
+        "text",             // ECPGt_string
+        "",                 // ECPGt_sqlda
+        "",                 // ECPGt_bytea
+    };
+
+    return types[type];
+}
+
+int describe(const Config* config)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+    char  conn[1024] = "";
+    const char* user  = config->user;
+    const char* pass  = config->pass;
+    const char* query = config->query;
+    EXEC SQL END DECLARE SECTION;
+
+    sprintf_s(conn, sizeof(conn), "tcp:postgresql://%s:%s/%s", config->host, config->port, config->db);
+
+    EXEC SQL CONNECT TO :conn USER :user IDENTIFIED BY :pass;
+
+    EXEC SQL SET CLIENT_ENCODING TO 'UTF-8';
+
+    EXEC SQL PREPARE stmt FROM :query;
+    EXEC SQL DESCRIBE stmt INTO sqlda;
+
+    printf("[");
+
+    for (int i = 0; i < sqlda->sqld; i++)
+    {
+        sqlvar_t v = sqlda->sqlvar[i];
+        printf("{\"type\": \"%s\", \"size\": %d, \"name\": \"%s\"}%s", nameOf(v.sqltype), v.sqllen, v.sqlname.data, ((i + 1) < sqlda->sqld ? "," : ""));
+    }
+
+    printf("]");
+
+    EXEC SQL DISCONNECT;
+
+    return 0;
+}
