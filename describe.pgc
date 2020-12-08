@@ -68,7 +68,8 @@ int describe(const Config* config)
     const char* query = config->query;
     EXEC SQL END DECLARE SECTION;
 
-    sprintf_s(conn, sizeof(conn), "tcp:postgresql://%s:%s/%s", config->host, config->port, config->db);
+    // sprintf_s(conn, sizeof(conn), "tcp:postgresql://%s:%s/%s", config->host, config->port, config->db);
+    snrintf(conn, sizeof(conn), "tcp:postgresql://%s:%s/%s", config->host, config->port, config->db);
 
     EXEC SQL CONNECT TO :conn USER :user IDENTIFIED BY :pass;
 
